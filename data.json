@@ -1,0 +1,109 @@
+{
+ "app": "lunch-pingpong",
+ "version": 2,
+ "meta": {
+  "currentSeason": 1,
+  "seasonStartedAt": "2026-11-11"
+ },
+ "players": {
+  "p01": {
+   "name": "택구",
+   "active": true,
+   "createdAt": "2026-11-11T00:00:01Z"
+  },
+  "p02": {
+   "name": "미미미미미미",
+   "active": true,
+   "createdAt": "2026-11-11T00:00:02Z"
+  },
+  "p03": {
+   "name": "부우엉이",
+   "active": true,
+   "createdAt": "2026-11-11T00:00:03Z"
+  },
+  "p04": {
+   "name": "파워리프터",
+   "active": true,
+   "createdAt": "2026-11-11T00:00:04Z"
+  },
+  "p05": {
+   "name": "설빙",
+   "active": true,
+   "createdAt": "2026-11-11T00:00:05Z"
+  },
+  "p06": {
+   "name": "박진현",
+   "active": true,
+   "createdAt": "2026-11-11T00:00:06Z"
+  },
+  "p07": {
+   "name": "다람이",
+   "active": true,
+   "createdAt": "2026-11-11T00:00:07Z"
+  },
+  "p08": {
+   "name": "오준성",
+   "active": true,
+   "createdAt": "2026-11-11T00:00:08Z"
+  }
+ },
+ "matches": {
+  "m001": {
+   "winner": "p07",
+   "loser": "p08",
+   "season": 1,
+   "playedAt": "2026-11-11",
+   "createdAt": "2026-11-11T03:00:01Z",
+   "score": ""
+  },
+  "m002": {
+   "winner": "p01",
+   "loser": "p07",
+   "season": 1,
+   "playedAt": "2026-11-11",
+   "createdAt": "2026-11-11T03:00:02Z",
+   "score": ""
+  },
+  "m003": {
+   "winner": "p01",
+   "loser": "p08",
+   "season": 1,
+   "playedAt": "2026-11-11",
+   "createdAt": "2026-11-11T03:00:03Z",
+   "score": ""
+  },
+  "m004": {
+   "winner": "p07",
+   "loser": "p03",
+   "season": 1,
+   "playedAt": "2026-11-11",
+   "createdAt": "2026-11-11T03:00:04Z",
+   "score": ""
+  },
+  "m005": {
+   "winner": "p08",
+   "loser": "p07",
+   "season": 1,
+   "playedAt": "2026-11-11",
+   "createdAt": "2026-11-11T03:00:05Z",
+   "score": ""
+  },
+  "m006": {
+   "winner": "p03",
+   "loser": "p07",
+   "season": 1,
+   "playedAt": "2026-11-11",
+   "createdAt": "2026-11-11T03:00:06Z",
+   "score": ""
+  },
+  "m007": {
+   "winner": "p02",
+   "loser": "p08",
+   "season": 1,
+   "playedAt": "2026-11-11",
+   "createdAt": "2026-11-11T03:00:07Z",
+   "score": ""
+  }
+ },
+ "seasons": {}
+}
