@@ -45,6 +45,11 @@
    "name": "오준성",
    "active": true,
    "createdAt": "2026-11-11T00:00:08Z"
+  },
+  "pmwepf4ppuizum": {
+   "name": "손수범",
+   "active": true,
+   "createdAt": "2026-11-13T08:17:48.179Z"
   }
  },
  "matches": {
@@ -105,5 +110,6 @@
    "score": ""
   }
  },
- "seasons": {}
+ "seasons": {},
+ "updatedAt": "2026-11-13T08:17:48.179Z"
 }
