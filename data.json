@@ -8,7 +8,7 @@
  "players": {
   "p01": {
    "name": "택구",
-   "active": true,
+   "active": false,
    "createdAt": "2026-11-11T00:00:01Z"
   },
   "p02": {
@@ -190,5 +190,5 @@
   }
  },
  "seasons": {},
- "updatedAt": "2026-11-13T11:03:58.486Z"
+ "updatedAt": "2026-11-13T11:49:59.575Z"
 }
