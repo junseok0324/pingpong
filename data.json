@@ -50,6 +50,11 @@
    "name": "손수범",
    "active": true,
    "createdAt": "2026-11-13T08:17:48.179Z"
+  },
+  "pmwepgjkt1tvlv": {
+   "name": "원띠",
+   "active": true,
+   "createdAt": "2026-11-13T08:18:54.132Z"
   }
  },
  "matches": {
@@ -111,5 +116,5 @@
   }
  },
  "seasons": {},
- "updatedAt": "2026-11-13T08:17:48.179Z"
+ "updatedAt": "2026-11-13T08:18:54.132Z"
 }
