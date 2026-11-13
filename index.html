@@ -38,6 +38,7 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -106,7 +107,7 @@ section.view.on{display:grid;gap:18px}
 
 /* forms */
 label{font-size:13px;color:var(--muted);font-weight:600;display:block;margin-bottom:5px}
-input[type=text],input[type=date],select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+input[type=text],input[type=password],input[type=date],select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
 textarea{min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
 .field{display:grid;gap:0}
 .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -638,7 +639,7 @@ function confirmDo(title,body,label,fn,danger){showDialog(title,body,[{t:"취소
 function showText(title,text){showDialog(title,'<textarea readonly id="dlgText">'+esc(text)+'</textarea><p class="note">길게 눌러 전체 선택 후 복사하세요.</p>',[{t:"닫기"}])}
 
 /* ---------- writes (GitHub: data.json in the repo) ---------- */
-function need(){if(!S.canWrite||!GH.token){toast("운영자 로그인이 필요해요. 규칙·백업 탭에서 로그인하세요.");return false}return true}
+function need(){if(!S.canWrite||!GH.token){toast("입력하려면 공용 코드나 운영자 로그인이 필요해요.");return false}return true}
 function fail(e){
   var st=e&&e.status;
   if(st===401||st===403){toast("토큰 권한이 없거나 만료됐어요. 다시 로그인해 주세요.")}
@@ -721,7 +722,7 @@ function seasonSnapshot(){
     streakKing:sk&&sk.streak?{name:sk.name,n:sk.streak}:null,giantKiller:gk&&gk.giant?{name:gk.name,n:gk.giant}:null};
 }
 function endSeason(){
-  if(!need())return;
+  if(!needOwner())return;
   var snap=seasonSnapshot();
   var body=snap.champion?"<p>챔피언: <b>"+esc(snap.champion.name)+"</b> ("+fmt(snap.champion.rating)+"점)</p>":"<p><b>아직 우승 자격(10경기 + 상대 4명)을 채운 선수가 없어요.</b> 이대로 끝내면 챔피언 없이 기록돼요.</p>";
   body+='<p class="note">최종 순위 '+snap.standings.length+"명이 명예의 전당에 저장되고, 시즌 "+(snap.number+1)+"이 시작돼요. 레이팅은 그대로 이어지고 전적만 0부터 시작해요.</p>";
@@ -734,7 +735,7 @@ function backupText(){
   return JSON.stringify({app:"lunch-pingpong",version:2,exportedAt:new Date().toISOString(),meta:S.meta||{currentSeason:1},players:S.players,matches:S.matches,seasons:S.seasons},null,1);
 }
 function restore(){
-  if(!need())return;
+  if(!needOwner())return;
   showDialog("백업 복원",'<p class="note">백업 글자(Claude 버전 백업도 가능)를 그대로 붙여넣어 주세요. 같은 ID의 기록은 덮어쓰고, 없는 기록은 추가돼요.</p><textarea id="restoreText" placeholder="{&quot;app&quot;:&quot;lunch-pingpong&quot;, ...}"></textarea>',[
     {t:"취소"},{t:"복원",cls:"ball",fn:function(){
       var data;try{data=JSON.parse($("restoreText").value)}catch(e){toast("백업 형식이 아니에요.");return false}
@@ -844,32 +845,121 @@ function refresh(){
     banner("data.json을 불러오지 못했어요. 저장소에 data.json이 올라가 있는지 확인해 주세요.");console.error(e);
   });
 }
+/* ---------- access: owner token, or shared code that unlocks an encrypted token ---------- */
+var VIA="";try{VIA=localStorage.getItem("pp_via")||""}catch(e){}
+S.access=null;
+function bytes(b64){var s=atob(b64),u=new Uint8Array(s.length);for(var i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u}
+function b64(u){var s="";u=new Uint8Array(u);for(var i=0;i<u.length;i++)s+=String.fromCharCode(u[i]);return btoa(s)}
+function keyFrom(code,salt,iter){
+  return crypto.subtle.importKey("raw",new TextEncoder().encode(code),"PBKDF2",false,["deriveKey"]).then(function(base){
+    return crypto.subtle.deriveKey({name:"PBKDF2",salt:salt,iterations:iter,hash:"SHA-256"},base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+  });
+}
+function sealToken(token,code){
+  var salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),iter=310000;
+  return keyFrom(code,salt,iter).then(function(k){return crypto.subtle.encrypt({name:"AES-GCM",iv:iv},k,new TextEncoder().encode(token))})
+    .then(function(ct){return {enabled:true,v:1,iter:iter,salt:b64(salt),iv:b64(iv),ct:b64(ct)}});
+}
+function openToken(code){
+  var a=S.access;
+  return keyFrom(code,bytes(a.salt),a.iter).then(function(k){return crypto.subtle.decrypt({name:"AES-GCM",iv:bytes(a.iv)},k,bytes(a.ct))})
+    .then(function(pt){return new TextDecoder().decode(pt)});
+}
+function loadAccess(){
+  var p="/repos/"+GH.owner+"/"+GH.repo+"/contents/access.json?ref="+GH.branch;
+  var viaApi=GH.owner?api(p).then(function(j){GH.accessSha=j.sha;return JSON.parse(b64dec(j.content))}):Promise.reject();
+  return viaApi.catch(function(e){
+    if(e&&e.status===404){GH.accessSha=null;return null}
+    return fetch("access.json?t="+Date.now(),{cache:"no-store"}).then(function(r){return r.ok?r.json():null}).catch(function(){return null});
+  }).then(function(a){S.access=a&&a.enabled&&a.ct?a:null;render()});
+}
+function putFile(path,obj,sha,msg){
+  var body=JSON.stringify({message:msg,content:b64enc(JSON.stringify(obj,null,1)+"\n"),branch:GH.branch,sha:sha||undefined});
+  return api("/repos/"+GH.owner+"/"+GH.repo+"/contents/"+path,{method:"PUT",body:body}).then(function(j){return j.content.sha});
+}
+function setLogin(token,via){
+  GH.token=token;VIA=via;
+  try{localStorage.setItem("pp_token",token);localStorage.setItem("pp_via",via)}catch(x){}
+}
+function logout(){
+  GH.token="";VIA="";try{localStorage.removeItem("pp_token");localStorage.removeItem("pp_via")}catch(x){}
+  S.canWrite=false;S.isOwner=false;render();
+}
 function checkToken(){
   if(!GH.token){S.canWrite=false;S.isOwner=false;render();return Promise.resolve()}
   return api("/repos/"+GH.owner+"/"+GH.repo).then(function(j){
-    S.canWrite=!!(j.permissions&&j.permissions.push);S.isOwner=S.canWrite;render();
+    S.canWrite=!!(j.permissions&&j.permissions.push);S.isOwner=S.canWrite&&VIA!=="code";render();
     if(!S.canWrite)toast("이 토큰에는 저장소 쓰기 권한이 없어요.");
-  },function(){S.canWrite=false;render();toast("토큰이 맞지 않거나 만료됐어요.")});
+  },function(){
+    var wasCode=VIA==="code";logout();
+    toast(wasCode?"공용 코드가 바뀌었거나 만료됐어요. 새 코드를 입력해 주세요.":"토큰이 맞지 않거나 만료됐어요.");
+  });
+}
+function needOwner(){if(!S.isOwner){toast("운영자(토큰 로그인)만 할 수 있어요.");return false}return need()}
+function unlockForm(id){
+  return '<div class="row"><input type="password" id="'+id+'" placeholder="공용 코드" autocomplete="off" style="flex:1;min-width:160px" aria-label="공용 코드"><button class="btn ball" type="button" data-unlock="'+id+'">입력 잠금 풀기</button></div>';
 }
 function renderAuth(){
   var box=$("authBox");if(!box)return;
+  var ae=document.activeElement,typing=ae&&ae.tagName==="INPUT"&&ae.value;
   var where=GH.owner?GH.owner+"/"+GH.repo:"(github.io에서 열면 자동 인식)";
-  box.innerHTML=S.canWrite?
-    '<p class="note">운영자로 로그인됨 · 저장소 <b>'+esc(where)+'</b></p><div class="row"><button class="btn" type="button" id="logoutBtn">이 기기에서 로그아웃</button></div>':
-    '<p class="note">저장소 <b>'+esc(where)+'</b> · 수정하려면 GitHub 토큰(Contents 읽기·쓰기 권한)을 한 번 입력하세요. 토큰은 이 기기 브라우저에만 저장돼요.</p><div class="row"><input type="text" id="tokenInput" placeholder="github_pat_..." autocomplete="off" style="flex:1;min-width:200px" aria-label="GitHub 토큰"><button class="btn primary" type="button" id="loginBtn">운영자 로그인</button></div>';
+  var html="";
+  if(S.isOwner){
+    html='<p class="note">운영자로 로그인됨 · 저장소 <b>'+esc(where)+'</b></p>';
+    html+='<div style="display:grid;gap:8px;margin:12px 0"><label for="codeSet">공용 코드 (누구나 선수·경기 입력)</label>'+
+      '<p class="note" style="margin:0">'+(S.access?"지금 공용 코드가 <b>켜져 있어요</b>. 바꾸면 기존 코드는 더 이상 안 통해요.":"공용 코드를 정하면 그 코드를 아는 사람 누구나 선수와 경기를 입력할 수 있어요. 시즌 종료와 복원은 운영자만 할 수 있어요.")+'</p>'+
+      '<div class="row"><input type="text" id="codeSet" placeholder="예: DueceKing" autocomplete="off" style="flex:1;min-width:160px"><button class="btn ball" type="button" id="codeSave">'+(S.access?"코드 바꾸기":"공용 코드 켜기")+'</button>'+
+      (S.access?'<button class="btn danger" type="button" id="codeOff">공용 코드 끄기</button>':"")+"</div></div>";
+    html+='<div class="row"><button class="btn" type="button" id="logoutBtn">이 기기에서 로그아웃</button></div>';
+  }else if(S.canWrite){
+    html='<p class="note">공용 코드로 입력 가능 상태예요. 선수·경기 입력과 삭제를 할 수 있어요.</p><div class="row"><button class="btn" type="button" id="logoutBtn">이 기기에서 잠그기</button></div>';
+  }else{
+    if(S.access)html+='<label for="codeAuth">공용 코드로 입력하기</label>'+unlockForm("codeAuth")+'<p class="note">코드는 운영자에게 물어보세요. 한 번 입력하면 이 기기에서는 계속 유지돼요.</p><hr style="border:0;border-top:1px solid var(--line);margin:14px 0">';
+    html+='<label for="tokenInput">운영자 로그인 (GitHub 토큰)</label><div class="row"><input type="password" id="tokenInput" placeholder="github_pat_..." autocomplete="off" style="flex:1;min-width:200px" aria-label="GitHub 토큰"><button class="btn primary" type="button" id="loginBtn">운영자 로그인</button></div><p class="note">저장소 <b>'+esc(where)+'</b> · 토큰은 이 기기 브라우저에만 저장돼요.</p>';
+  }
+  if(!(typing&&box.contains(ae)))box.innerHTML=html;
+  ["playLock","rosterLock"].forEach(function(id){
+    var el=$(id);if(!el||S.canWrite||(typing&&el.contains(ae)))return;
+    el.innerHTML=S.access?
+      '<div style="display:grid;gap:8px"><span>'+(id==="playLock"?"결과를 입력하려면 공용 코드를 한 번 입력하세요. 아래 계산기는 누구나 써볼 수 있어요.":"선수를 추가·수정하려면 공용 코드를 한 번 입력하세요.")+"</span>"+unlockForm(id+"Code")+"</div>":
+      (id==="playLock"?"결과 입력은 운영자만 할 수 있어요. 아래 계산기는 누구나 써볼 수 있어요.":"선수 추가·수정은 운영자만 할 수 있어요.");
+  });
+  $("endSeasonBtn").hidden=!S.isOwner;
+  $("openRestore").hidden=!S.isOwner;
+  var rp=$("rolePill");rp.textContent=S.isOwner?"운영자":S.canWrite?"입력 가능":"보기 전용";
+}
+function unlock(code){
+  if(!code)return;
+  if(!S.access){toast("공용 코드가 꺼져 있어요.");return}
+  openToken(code).then(function(t){setLogin(t,"code");return checkToken()}).then(function(){if(S.canWrite)toast("입력 잠금을 풀었어요")},
+    function(){toast("코드가 맞지 않아요.")});
 }
 document.addEventListener("click",function(e){
-  if(e.target.id==="loginBtn"){
-    var t=$("tokenInput").value.trim();if(!t)return;
-    GH.token=t;try{localStorage.setItem("pp_token",t)}catch(x){}
+  var t=e.target;
+  if(t.dataset&&t.dataset.unlock){unlock(($(t.dataset.unlock).value||"").trim())}
+  else if(t.id==="loginBtn"){
+    var v=$("tokenInput").value.trim();if(!v)return;
+    setLogin(v,"owner");
     checkToken().then(function(){if(S.canWrite)toast("운영자 로그인 완료")});
-  }else if(e.target.id==="logoutBtn"){
-    GH.token="";try{localStorage.removeItem("pp_token")}catch(x){}
-    S.canWrite=false;S.isOwner=false;render();toast("로그아웃했어요");
+  }else if(t.id==="logoutBtn"){logout();toast("이 기기를 잠갔어요")}
+  else if(t.id==="codeSave"){
+    if(!needOwner())return;
+    var code=$("codeSet").value.trim();
+    if(code.length<6){toast("코드는 6자 이상으로 정해 주세요.");return}
+    sealToken(GH.token,code).then(function(obj){return putFile("access.json",obj,GH.accessSha,"공용 코드 설정")})
+      .then(function(sha){GH.accessSha=sha;return loadAccess()}).then(function(){toast("공용 코드를 켰어요. 친구들에게 코드를 알려주세요")},fail);
+  }else if(t.id==="codeOff"){
+    if(!needOwner())return;
+    confirmDo("공용 코드 끄기","끄면 공용 코드로 잠금을 푼 기기에서도 더 이상 입력할 수 없게 하려면, GitHub에서 지금 토큰을 삭제하고 새 토큰을 만들어 다시 로그인하세요.","끄기",function(){
+      putFile("access.json",{enabled:false},GH.accessSha,"공용 코드 끄기").then(function(sha){GH.accessSha=sha;S.access=null;render();toast("공용 코드를 껐어요")},fail);
+    },true);
   }
 });
+document.addEventListener("keydown",function(e){
+  if(e.key==="Enter"&&e.target.dataset&&e.target.id&&/Code$|codeAuth/.test(e.target.id)){e.preventDefault();unlock(e.target.value.trim())}
+});
 var _render=render;render=function(){_render();renderAuth()};
-refresh();checkToken();
+refresh();loadAccess().then(checkToken);
 setInterval(function(){if(!document.hidden)refresh()},60000);
 document.addEventListener("visibilitychange",function(){if(!document.hidden)refresh()});
 
