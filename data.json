@@ -211,8 +211,16 @@
    "playedAt": "2026-11-20",
    "createdAt": "2026-11-20T13:26:26.837Z",
    "score": ""
+  },
+  "mmwp0j9z78g2jx": {
+   "winner": "p01",
+   "loser": "p07",
+   "season": 1,
+   "playedAt": "2026-11-20",
+   "createdAt": "2026-11-20T13:26:38.659Z",
+   "score": ""
   }
  },
  "seasons": {},
- "updatedAt": "2026-11-20T13:26:27.303Z"
+ "updatedAt": "2026-11-20T13:26:39.192Z"
 }
